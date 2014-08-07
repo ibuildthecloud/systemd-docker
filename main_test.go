@@ -7,7 +7,13 @@ import (
 	"path"
 	"syscall"
 	"testing"
+
+	dockerClient "github.com/fsouza/go-dockerclient"
 )
+
+func init() {
+	INTERVAL = 100
+}
 
 func TestParseNoRun(t *testing.T) {
 	_, err := parseContext([]string{"a", "b", "-d"})
@@ -16,15 +22,55 @@ func TestParseNoRun(t *testing.T) {
 	}
 }
 
-func TestParseNoD(t *testing.T) {
-	_, err := parseContext([]string{"a", "run"})
-	if err == nil {
-		t.Fatal("parse succeeded")
+func TestParseCgroupsAll(t *testing.T) {
+	c, err := parseContext([]string{"--cgroups", "all", "run"})
+	if err != nil {
+		t.Fatal("parse failed", err)
+	}
+
+	if !c.AllCgroups {
+		t.Fatal("all cgroups should be true")
+	}
+}
+
+func TestParseCgroupList(t *testing.T) {
+	c, err := parseContext([]string{"--cgroups", "a", "--cgroups", "b", "run"})
+	if err != nil {
+		t.Fatal("parse failed", err)
+	}
+
+	if c.AllCgroups {
+		t.Fatal("all cgroups should be false")
+	}
+
+	if c.Cgroups[0] != "a" ||
+		c.Cgroups[1] != "b" {
+		t.Fatal("Invalid cgroups value", c.Cgroups)
+	}
+}
+
+func TestParseNotify(t *testing.T) {
+	c, err := parseContext([]string{"run"})
+	if err != nil {
+		t.Fatal("parse failed", err)
+	}
+
+	if c.Notify {
+		t.Fatal("notify should be false")
+	}
+
+	c, err = parseContext([]string{"--notify", "run"})
+	if err != nil {
+		t.Fatal("parse failed", err)
+	}
+
+	if c.Notify {
+		t.Fatal("notify should be false because NOTIFY_SOCKET is unset")
 	}
 }
 
 func TestParseArgs(t *testing.T) {
-	c, err := parseContext([]string{"a", "run", "-d", "c", "d"})
+	c, err := parseContext([]string{"--logs=false", "run", "c", "-rm", "d"})
 	if err != nil {
 		t.Fatal("failed to parse:", err)
 	}
@@ -37,7 +83,7 @@ func TestParseArgs(t *testing.T) {
 }
 
 func TestParseEnv(t *testing.T) {
-	c, err := parseContext([]string{"a", "run", "--env", "-d"})
+	c, err := parseContext([]string{"run", "--env", "-d"})
 	if err != nil {
 		t.Fatal("failed to parse:", err)
 	}
@@ -46,7 +92,7 @@ func TestParseEnv(t *testing.T) {
 		t.Fatal("env shouldn't be set")
 	}
 
-	c, err = parseContext([]string{"a", "--env", "run", "-d"})
+	c, err = parseContext([]string{"--env", "run", "-d"})
 	if err != nil {
 		t.Fatal("failed to parse:", err)
 	}
@@ -57,7 +103,7 @@ func TestParseEnv(t *testing.T) {
 }
 
 func TestParseLogs(t *testing.T) {
-	c, err := parseContext([]string{"a", "run", "--no-logs", "-d"})
+	c, err := parseContext([]string{"run", "--logs", "false", "-d"})
 	if err != nil {
 		t.Fatal("failed to parse:", err)
 	}
@@ -66,13 +112,79 @@ func TestParseLogs(t *testing.T) {
 		t.Fatal("logs should be set")
 	}
 
-	c, err = parseContext([]string{"a", "--no-logs", "run", "-d"})
+	c, err = parseContext([]string{"--logs=false", "run", "-d"})
 	if err != nil {
 		t.Fatal("failed to parse:", err)
 	}
 
 	if c.Logs {
 		t.Fatal("logs shouldn't be set")
+	}
+}
+
+func TestParseName(t *testing.T) {
+	c, err := parseContext([]string{"run", "-d", "--logs", "--name=blah"})
+	if err != nil {
+		t.Fatal("failed to parse:", err)
+	}
+
+	if c.Name != "blah" {
+		t.Fatal("failed to parse name", c.Name)
+	}
+}
+
+func TestParseName2(t *testing.T) {
+	c, err := parseContext([]string{"run", "-d", "--logs", "--name", "blah"})
+	if err != nil {
+		t.Fatal("failed to parse:", err)
+	}
+
+	if c.Name != "blah" {
+		t.Fatal("failed to parse name", c.Name)
+	}
+}
+
+func TestParseName3(t *testing.T) {
+	c, err := parseContext([]string{"run", "-d", "--logs", "-name", "blah"})
+	if err != nil {
+		t.Fatal("failed to parse:", err)
+	}
+
+	if c.Name != "blah" {
+		t.Fatal("failed to parse name", c.Name)
+	}
+}
+
+func TestParseName4(t *testing.T) {
+	c, err := parseContext([]string{"run", "-d", "--logs", "-name"})
+	if err != nil {
+		t.Fatal("failed to parse:", err)
+	}
+
+	if len(c.Name) != 0 {
+		t.Fatal("failed to parse name", c.Name)
+	}
+}
+
+func TestParseRm(t *testing.T) {
+	c, err := parseContext([]string{"run", "-d", "--logs", "-name"})
+	if err != nil {
+		t.Fatal("failed to parse:", err)
+	}
+
+	if c.Rm {
+		t.Fatal("failed to parse rm", c.Rm)
+	}
+}
+
+func TestParseRmSet(t *testing.T) {
+	c, err := parseContext([]string{"run", "-d", "--logs", "-rm"})
+	if err != nil {
+		t.Fatal("failed to parse:", err)
+	}
+
+	if !c.Rm {
+		t.Fatal("failed to parse rm", c.Rm)
 	}
 }
 
@@ -121,7 +233,7 @@ func TestGoodExec(t *testing.T) {
 }
 
 func TestParseCgroups(t *testing.T) {
-	cgroups, err := getNamespacesForPid(os.Getpid())
+	cgroups, err := getCgroupsForPid(os.Getpid())
 	if err != nil {
 		log.Fatal("Error:", err)
 	}
@@ -136,7 +248,7 @@ func TestParseCgroups(t *testing.T) {
 	}
 }
 
-func TestMoveNamespace(t *testing.T) {
+func TestMoveCgroup(t *testing.T) {
 	c := &Context{
 		Args: []string{"-d", "busybox", "echo", "hi"},
 	}
@@ -156,8 +268,187 @@ func TestMoveNamespace(t *testing.T) {
 		t.Fatal("Bad container pid", c.Pid)
 	}
 
-	moved, err := moveNamespaces(c)
+	moved, err := moveCgroups(c)
 	if !moved || err != nil {
 		t.Fatal("Failed to move namespaces ", moved, err)
 	}
+}
+
+func TestRemoveNoLogs(t *testing.T) {
+	c, err := mainWithArgs([]string{"--logs=false", "run", "-rm", "busybox", "echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := getClient(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.InspectContainer(c.Id)
+	if _, ok := err.(*dockerClient.NoSuchContainer); !ok {
+		t.Fatal("Should have failed")
+	}
+}
+
+func TestRemoveWithLogs(t *testing.T) {
+	c, err := mainWithArgs([]string{"--logs", "run", "-rm", "busybox", "echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := getClient(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.InspectContainer(c.Id)
+	if _, ok := err.(*dockerClient.NoSuchContainer); !ok {
+		t.Fatal("Should have failed")
+	}
+}
+
+func deleteTestContainer(t *testing.T) {
+	client, err := getClient(&Context{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.InspectContainer("systemd-docker-test")
+	if err == nil {
+		log.Println("Deleting existing container", container.ID)
+		err = client.RemoveContainer(dockerClient.RemoveContainerOptions{
+			ID:    container.ID,
+			Force: true,
+		})
+
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func TestNamedContainerNoRm(t *testing.T) {
+	client, err := getClient(&Context{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	deleteTestContainer(t)
+
+	c, err := mainWithArgs([]string{"--logs", "run", "--name", "systemd-docker-test", "busybox", "echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.InspectContainer("systemd-docker-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if container.State.Running {
+		t.Fatal("Should not be running")
+	}
+
+	c, err = mainWithArgs([]string{"--logs", "run", "--name", "systemd-docker-test", "busybox", "echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container2, err := client.InspectContainer(c.Id)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if container2.State.Running {
+		t.Fatal("Should not be running")
+	}
+
+	if container.ID != container2.ID {
+		t.Fatal("Should be the same container", container.ID, container2.ID)
+	}
+
+	deleteTestContainer(t)
+}
+
+func TestNamedContainerRmPrevious(t *testing.T) {
+	client, err := getClient(&Context{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	deleteTestContainer(t)
+
+	c, err := mainWithArgs([]string{"--logs", "run", "--name", "systemd-docker-test", "busybox", "echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.InspectContainer("systemd-docker-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if container.State.Running {
+		t.Fatal("Should not be running")
+	}
+
+	c, err = mainWithArgs([]string{"--logs", "run", "--rm", "--name", "systemd-docker-test", "busybox", "echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.InspectContainer(c.Id)
+	if err == nil {
+		t.Fatal("Should not exists")
+	}
+
+	if container.ID == c.Id {
+		t.Fatal("Should not be the same container", container.ID, c.Id)
+	}
+
+	deleteTestContainer(t)
+}
+
+func TestNamedContainerAttach(t *testing.T) {
+	client, err := getClient(&Context{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	deleteTestContainer(t)
+
+	c, err := mainWithArgs([]string{"--logs=false", "run", "--name", "systemd-docker-test", "busybox", "sleep", "2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container, err := client.InspectContainer("systemd-docker-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !container.State.Running {
+		t.Fatal("Should be running")
+	}
+
+	c, err = mainWithArgs([]string{"--logs=false", "run", "--name", "systemd-docker-test", "busybox", "echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	container2, err := client.InspectContainer(c.Id)
+	if err != nil {
+		t.Fatal("Should exists", err)
+	}
+
+	if !container2.State.Running {
+		t.Fatal("Should be running")
+	}
+
+	if container.ID != container2.ID {
+		t.Fatal("Should not be the same container", container.ID, container2.ID)
+	}
+
+	deleteTestContainer(t)
 }

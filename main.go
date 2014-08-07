@@ -13,71 +13,176 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/docker/docker/opts"
+	flag "github.com/docker/docker/pkg/mflag"
 
 	dockerClient "github.com/fsouza/go-dockerclient"
 )
 
 var (
-	SYSFS       string = "/sys/fs/cgroup"
-	PROCS       string = "cgroup.procs"
-	CGROUP_PROC string = "/proc/%d/cgroup"
+	SYSFS       string        = "/sys/fs/cgroup"
+	PROCS       string        = "cgroup.procs"
+	CGROUP_PROC string        = "/proc/%d/cgroup"
+	INTERVAL    time.Duration = 1000
 )
 
 type Context struct {
-	Args          []string
-	Namespaces    []string
-	AllNamespaces bool
-	Logs          bool
-	Env           bool
-	Id            string
-	NotifySocket  string
-	Cmd           *exec.Cmd
-	Pid           int
-	Client        *dockerClient.Client
+	Args         []string
+	Cgroups      []string
+	AllCgroups   bool
+	Logs         bool
+	Notify       bool
+	Name         string
+	Env          bool
+	Rm           bool
+	Id           string
+	NotifySocket string
+	Cmd          *exec.Cmd
+	Pid          int
+	Client       *dockerClient.Client
 }
 
-func parseContext(args []string) (*Context, error) {
-	c := &Context{
-		Logs:          true,
-		AllNamespaces: true,
+func setupEnvironment(c *Context) {
+	newArgs := []string{}
+	if c.Notify && len(c.NotifySocket) > 0 {
+		newArgs = append(newArgs, "-e", fmt.Sprintf("NOTIFY_SOCKET=%s", c.NotifySocket))
+		newArgs = append(newArgs, "-v", fmt.Sprintf("%s:%s", c.NotifySocket, c.NotifySocket))
+	} else {
+		c.Notify = false
 	}
 
-	/* Probably could have done this easily with flags */
-	foundRun := false
-	foundD := false
-
-	for _, val := range args {
-		if foundRun {
-			if val == "-d" {
-				foundD = true
-			}
-			c.Args = append(c.Args, val)
-		} else {
-			switch val {
-			case "--env":
-				c.Env = true
-			case "--no-logs":
-				c.Logs = false
-			case "run":
-				foundRun = true
+	if c.Env {
+		for _, val := range os.Environ() {
+			if !strings.HasPrefix(val, "HOME=") && !strings.HasPrefix(val, "PATH=") {
+				newArgs = append(newArgs, "-e", val)
 			}
 		}
 	}
 
-	if !foundRun {
+	if len(newArgs) > 0 {
+		c.Args = append(newArgs, c.Args...)
+	}
+}
+
+func parseContext(args []string) (*Context, error) {
+	c := &Context{
+		Logs:       true,
+		AllCgroups: false,
+	}
+
+	flags := flag.NewFlagSet("run", flag.ContinueOnError)
+
+	var flCgroups opts.ListOpts
+
+	flags.BoolVar(&c.Logs, []string{"l", "-logs"}, true, "pipe logs")
+	flags.BoolVar(&c.Notify, []string{"n", "-notify"}, false, "setup systemd notify for container")
+	flags.BoolVar(&c.Env, []string{"e", "-env"}, false, "inherit environment variable")
+	flags.Var(&flCgroups, []string{"c", "-cgroups"}, "cgroups to take ownership of or 'all' for all cgroups available")
+
+	err := flags.Parse(args)
+	if err != nil {
+		return nil, err
+	}
+
+	foundD := false
+	var name string
+
+	runArgs := flags.Args()
+	if len(runArgs) == 0 || runArgs[0] != "run" {
+		log.Println("Args:", runArgs)
 		return nil, errors.New("run not found in arguments")
 	}
 
-	if !foundD {
-		return nil, errors.New("-d is required")
+	runArgs = runArgs[1:]
+	newArgs := make([]string, 0, len(runArgs))
+
+	for i, arg := range runArgs {
+		/* This is tedious, but flag can't ignore unknown flags and I don't want to define them all */
+		add := true
+
+		switch {
+		case arg == "-rm" || arg == "--rm":
+			c.Rm = true
+			add = false
+		case arg == "-d" || arg == "-detach" || arg == "--detach":
+			foundD = true
+		case strings.HasPrefix(arg, "-name") || strings.HasPrefix(arg, "--name"):
+			if strings.Contains(arg, "=") {
+				name = strings.SplitN(arg, "=", 2)[1]
+			} else if len(runArgs) > i+1 {
+				name = runArgs[i+1]
+			}
+		}
+
+		if add {
+			newArgs = append(newArgs, arg)
+		}
 	}
 
+	if !foundD {
+		newArgs = append([]string{"-d"}, newArgs...)
+	}
+
+	c.Name = name
 	c.NotifySocket = os.Getenv("NOTIFY_SOCKET")
+	c.Args = newArgs
+	c.Cgroups = flCgroups.GetAll()
+
+	for _, val := range c.Cgroups {
+		if val == "all" {
+			c.Cgroups = nil
+			c.AllCgroups = true
+			break
+		}
+	}
+
+	setupEnvironment(c)
 
 	return c, nil
 }
 
-func runContainer(c *Context) error {
+func lookupNamedContainer(c *Context) error {
+	client, err := getClient(c)
+	if err != nil {
+		return err
+	}
+
+	container, err := client.InspectContainer(c.Name)
+	if _, ok := err.(*dockerClient.NoSuchContainer); ok {
+		return nil
+	}
+
+	if container.State.Running {
+		c.Id = container.ID
+		c.Pid = container.State.Pid
+		return nil
+	} else if c.Rm {
+		return client.RemoveContainer(dockerClient.RemoveContainerOptions{
+			ID:    container.ID,
+			Force: true,
+		})
+	} else {
+		client, err := getClient(c)
+		err = client.StartContainer(container.ID, nil)
+		if err != nil {
+			return err
+		}
+
+		container, err = client.InspectContainer(c.Name)
+		if err != nil {
+			return err
+		}
+
+		c.Id = container.ID
+		c.Pid = container.State.Pid
+
+		return nil
+	}
+}
+
+func launchContainer(c *Context) error {
 	args := append([]string{"run"}, c.Args...)
 	c.Cmd = exec.Command("docker", args...)
 
@@ -119,6 +224,29 @@ func runContainer(c *Context) error {
 	return err
 }
 
+func runContainer(c *Context) error {
+	if len(c.Name) > 0 {
+		err := lookupNamedContainer(c)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	if len(c.Id) == 0 {
+		err := launchContainer(c)
+		if err != nil {
+			return err
+		}
+	}
+
+	if c.Pid == 0 {
+		return errors.New("Failed to launch container, pid is 0")
+	}
+
+	return nil
+}
+
 func getClient(c *Context) (*dockerClient.Client, error) {
 	if c.Client != nil {
 		return c.Client, nil
@@ -154,7 +282,7 @@ func getContainerPid(c *Context) (int, error) {
 	return container.State.Pid, nil
 }
 
-func getNamespacesForPid(pid int) (map[string]string, error) {
+func getCgroupsForPid(pid int) (map[string]string, error) {
 	file, err := os.Open(fmt.Sprintf(CGROUP_PROC, pid))
 	if err != nil {
 		return nil, err
@@ -207,27 +335,27 @@ func writePid(pid string, path string) error {
 	return ioutil.WriteFile(path, []byte(pid), 0644)
 }
 
-func moveNamespaces(c *Context) (bool, error) {
+func moveCgroups(c *Context) (bool, error) {
 	moved := false
-	currentCgroups, err := getNamespacesForPid(os.Getpid())
+	currentCgroups, err := getCgroupsForPid(os.Getpid())
 	if err != nil {
 		return false, err
 	}
 
-	containerCgroups, err := getNamespacesForPid(c.Pid)
+	containerCgroups, err := getCgroupsForPid(c.Pid)
 	if err != nil {
 		return false, err
 	}
 
 	var ns []string
 
-	if c.AllNamespaces || c.Namespaces == nil {
-		ns = make([]string, len(containerCgroups))
+	if c.AllCgroups || c.Cgroups == nil || len(c.Cgroups) == 0 {
+		ns = make([]string, 0, len(containerCgroups))
 		for value, _ := range containerCgroups {
 			ns = append(ns, value)
 		}
 	} else {
-		ns = c.Namespaces
+		ns = c.Cgroups
 	}
 
 	for _, nsName := range ns {
@@ -305,9 +433,11 @@ func notify(c *Context) error {
 		return errors.New("Container exited before we could notify systemd")
 	}
 
-	_, err = conn.Write([]byte("READY=1"))
-	if err != nil {
-		return err
+	if !c.Notify {
+		_, err = conn.Write([]byte("READY=1"))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -335,28 +465,85 @@ func pipeLogs(c *Context) error {
 	return err
 }
 
-func main() {
-	c, err := parseContext(os.Args)
+func keepAlive(c *Context) error {
+	if c.Logs || c.Rm {
+		client, err := getClient(c)
+		if err != nil {
+			return err
+		}
+
+		/* Good old polling... */
+		for true {
+			container, err := client.InspectContainer(c.Id)
+			if err != nil {
+				return err
+			}
+
+			if container.State.Running {
+				time.Sleep(INTERVAL * time.Millisecond)
+			} else {
+				return nil
+			}
+		}
+	}
+
+	return nil
+}
+
+func rmContainer(c *Context) error {
+	if !c.Rm {
+		return nil
+	}
+
+	client, err := getClient(c)
 	if err != nil {
-		log.Fatal(err)
+		return err
+	}
+
+	return client.RemoveContainer(dockerClient.RemoveContainerOptions{
+		ID:    c.Id,
+		Force: true,
+	})
+}
+
+func mainWithArgs(args []string) (*Context, error) {
+	c, err := parseContext(args)
+	if err != nil {
+		return c, err
 	}
 
 	err = runContainer(c)
 	if err != nil {
-		log.Fatal(err)
+		return c, err
 	}
 
-	_, err = moveNamespaces(c)
+	_, err = moveCgroups(c)
 	if err != nil {
-		log.Fatal(err)
+		return c, err
 	}
 
 	err = notify(c)
 	if err != nil {
-		log.Fatal(err)
+		return c, err
 	}
 
-	err = pipeLogs(c)
+	go pipeLogs(c)
+
+	err = keepAlive(c)
+	if err != nil {
+		return c, err
+	}
+
+	err = rmContainer(c)
+	if err != nil {
+		return c, err
+	}
+
+	return c, nil
+}
+
+func main() {
+	_, err := mainWithArgs(os.Args[1:])
 	if err != nil {
 		log.Fatal(err)
 	}
