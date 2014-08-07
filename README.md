@@ -93,6 +93,35 @@ By default `systemd-docker` will send READY=1 to the systemd notification socket
 
 What this will do is setup a bind mount for the notification socket and then set the NOTIFY_SOCKET environment variable.  If you are going to use this feature of systemd take some time to understand the quirks of it.  More info in this [mailing list thread](http://comments.gmane.org/gmane.comp.sysutils.systemd.devel/18649).  In short, systemd-notify is not reliable because often the child dies before systemd has time to determine which cgroup it is a member of
 
+Running on CoreOS
+=================
+
+If you are running on CoreOS, it may be more problematic to install `systemd-docker` to `/opt/bin`.  To make this easier add the following line to your unit file.
+
+`ExecStartPre=/usr/bin/docker run --rm -v /opt/bin:/opt/bin ibuildthecloud/systemd-docker`
+
+That command will install systemd-docker to /opt/bin.  The full nginx example that is above would now be as below.
+
+```ini
+[Unit]
+Description=Nginx
+After=docker.service
+Requires=docker.service
+
+[Service]
+ExecStartPre=/usr/bin/docker run --rm -v /opt/bin:/opt/bin ibuildthecloud/systemd-docker
+ExecStart=/opt/bin/systemd-docker run --rm --name %n nginx
+Restart=always
+RestartSec=10s
+Type=notify
+NotifyAccess=all
+TimeoutStartSec=120
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
+```
+
 License
 -------
 [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
