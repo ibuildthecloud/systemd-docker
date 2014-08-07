@@ -41,6 +41,7 @@ type Context struct {
 	NotifySocket string
 	Cmd          *exec.Cmd
 	Pid          int
+	PidFile      string
 	Client       *dockerClient.Client
 }
 
@@ -72,10 +73,11 @@ func parseContext(args []string) (*Context, error) {
 		AllCgroups: false,
 	}
 
-	flags := flag.NewFlagSet("run", flag.ContinueOnError)
+	flags := flag.NewFlagSet("systemd-docker", flag.ContinueOnError)
 
 	var flCgroups opts.ListOpts
 
+	flags.StringVar(&c.PidFile, []string{"p", "-pid-file"}, "", "pipe file")
 	flags.BoolVar(&c.Logs, []string{"l", "-logs"}, true, "pipe logs")
 	flags.BoolVar(&c.Notify, []string{"n", "-notify"}, false, "setup systemd notify for container")
 	flags.BoolVar(&c.Env, []string{"e", "-env"}, false, "inherit environment variable")
@@ -443,6 +445,19 @@ func notify(c *Context) error {
 	return nil
 }
 
+func pidFile(c *Context) error {
+	if len(c.PidFile) == 0 || c.Pid <= 0 {
+		return nil
+	}
+
+	err := ioutil.WriteFile(c.PidFile, []byte(strconv.Itoa(c.Pid)), 0644)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func pipeLogs(c *Context) error {
 	if !c.Logs {
 		return nil
@@ -523,6 +538,11 @@ func mainWithArgs(args []string) (*Context, error) {
 	}
 
 	err = notify(c)
+	if err != nil {
+		return c, err
+	}
+
+	err = pidFile(c)
 	if err != nil {
 		return c, err
 	}

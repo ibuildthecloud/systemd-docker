@@ -1,10 +1,12 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path"
+	"strconv"
 	"syscall"
 	"testing"
 
@@ -451,4 +453,41 @@ func TestNamedContainerAttach(t *testing.T) {
 	}
 
 	deleteTestContainer(t)
+}
+
+func Exist(path string) bool {
+	_, err := os.Stat(path)
+	return os.IsExist(err)
+}
+
+func TestPidFile(t *testing.T) {
+	client, err := getClient(&Context{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pidFileName := "./pid-file"
+
+	os.Remove(pidFileName)
+
+	c, err := mainWithArgs([]string{"--logs=false", "--pid-file", "./pid-file", "run", "--rm", "busybox", "echo", "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = client.InspectContainer(c.Id)
+	if err == nil {
+		t.Fatal("Container should not exist")
+	}
+
+	bytes, err := ioutil.ReadFile(pidFileName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(bytes) != strconv.Itoa(c.Pid) {
+		t.Fatal("Failed to write pid file")
+	}
+
+	os.Remove(pidFileName)
 }

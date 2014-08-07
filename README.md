@@ -83,6 +83,13 @@ The main magic of how this works is that the container processes are moved from 
 
 The above will use the `name=systemd` and `cpu` cgroups of systemd but then use Docker's cgroups for all the others, like the freezer cgroup.
 
+Pid File
+--------
+
+If for whatever reason you want to create a pid file for the container PID, you can.  Just add `--pid-file` as below
+
+`ExecStart=/opt/bin/systemd-docker --pid-file=/var/run/%n.pid --env run --rm --name %n nginx`
+
 systemd-notify support
 ----------------------
 
