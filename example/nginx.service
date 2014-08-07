@@ -4,7 +4,7 @@ After=docker.service
 Requires=docker.service
 
 [Service]
-ExecStart=/opt/bin/systemd-docker run --rm --name %N nginx
+ExecStart=/opt/bin/systemd-docker run --rm --name %n nginx
 Restart=always
 RestartSec=10s
 Type=notify
