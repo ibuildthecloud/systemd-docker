@@ -8,7 +8,7 @@ Using this wrapper you can manages containers through `systemctl` or `docker` CL
 Why I wrote this?
 =================
 
-The full context is in [Docker Issue #7015](https://github.com/docker/docker/issues/7015) and this [mailing list thread](https://groups.google.com/d/topic/coreos-dev/wf7G6rA7Bf4/discussion).  The short of it is that systemd does not actually supervise the Docker container but instead the Docker client.  This makes systemd incapable of reliably managing Docker containers without hitting a bunch of really odd situations.
+The full context is in [Docker Issue #6791](https://github.com/docker/docker/issues/6791) and this [mailing list thread](https://groups.google.com/d/topic/coreos-dev/wf7G6rA7Bf4/discussion).  The short of it is that systemd does not actually supervise the Docker container but instead the Docker client.  This makes systemd incapable of reliably managing Docker containers without hitting a bunch of really odd situations.
 
 Installation
 ============
