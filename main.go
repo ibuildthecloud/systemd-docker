@@ -155,6 +155,9 @@ func lookupNamedContainer(c *Context) error {
 	if _, ok := err.(*dockerClient.NoSuchContainer); ok {
 		return nil
 	}
+	if err != nil {
+		return err
+	}
 
 	if container.State.Running {
 		c.Id = container.ID
