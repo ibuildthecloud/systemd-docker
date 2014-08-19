@@ -155,7 +155,7 @@ func lookupNamedContainer(c *Context) error {
 	if _, ok := err.(*dockerClient.NoSuchContainer); ok {
 		return nil
 	}
-	if err != nil {
+	if err != nil || container == nil {
 		return err
 	}
 
