@@ -1,4 +1,4 @@
 #!/bin/bash -e
 
 echo "Building systemd-docker..."
-godep go build -o bin/systemd-docker .
+GOPATH=$(pwd)/Godeps/_workspace go build -o bin/systemd-docker .
