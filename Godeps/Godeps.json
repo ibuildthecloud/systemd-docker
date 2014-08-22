@@ -1,0 +1,66 @@
+{
+	"ImportPath": "github.com/ibuildthecloud/systemd-docker",
+	"GoVersion": "go1.2.2",
+	"Deps": [
+		{
+			"ImportPath": "github.com/docker/docker/api",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/dockerversion",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/engine",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/opts",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/log",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/mflag",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/parsers",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/term",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/units",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/pkg/version",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/docker/docker/utils",
+			"Comment": "v1.2.0-11-g6bc773b",
+			"Rev": "6bc773b2c1cbce828dde3a5bee7d7d4dd893ec3b"
+		},
+		{
+			"ImportPath": "github.com/fsouza/go-dockerclient",
+			"Comment": "0.2.1-219-gadb8617",
+			"Rev": "adb861704259d548b45e08b5dd7b7c80efcd82e6"
+		}
+	]
+}

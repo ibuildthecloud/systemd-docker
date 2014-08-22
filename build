@@ -1,0 +1,4 @@
+#!/bin/bash -e
+
+echo "Building systemd-docker..."
+godep go build -o bin/systemd-docker .
