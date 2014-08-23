@@ -75,7 +75,7 @@ func parseContext(args []string) (*Context, error) {
 
 	flags := flag.NewFlagSet("systemd-docker", flag.ContinueOnError)
 
-	var flCgroups opts.ListOpts
+	flCgroups := opts.NewListOpts(nil)
 
 	flags.StringVar(&c.PidFile, []string{"p", "-pid-file"}, "", "pipe file")
 	flags.BoolVar(&c.Logs, []string{"l", "-logs"}, true, "pipe logs")
