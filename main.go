@@ -552,19 +552,19 @@ func mainWithArgs(args []string) (*Context, error) {
 		return c, err
 	}
 
-  if !c.Detach {
-    go pipeLogs(c)
-  
-  	err = keepAlive(c)
-  	if err != nil {
-  		return c, err
-  	}
-    
-  	err = rmContainer(c)
-  	if err != nil {
-  		return c, err
-  	}
-  }
+	if !c.Detach {
+		go pipeLogs(c)
+
+		err = keepAlive(c)
+		if err != nil {
+			return c, err
+		}
+
+		err = rmContainer(c)
+		if err != nil {
+			return c, err
+		}
+	}
 
 	return c, nil
 }
