@@ -43,6 +43,7 @@ type Context struct {
 	Pid          int
 	PidFile      string
 	Client       *dockerClient.Client
+	Detach       bool
 }
 
 func setupEnvironment(c *Context) {
@@ -131,6 +132,7 @@ func parseContext(args []string) (*Context, error) {
 	c.NotifySocket = os.Getenv("NOTIFY_SOCKET")
 	c.Args = newArgs
 	c.Cgroups = flCgroups.GetAll()
+	c.Detach = foundD
 
 	for _, val := range c.Cgroups {
 		if val == "all" {
@@ -550,17 +552,19 @@ func mainWithArgs(args []string) (*Context, error) {
 		return c, err
 	}
 
-	go pipeLogs(c)
-
-	err = keepAlive(c)
-	if err != nil {
-		return c, err
-	}
-
-	err = rmContainer(c)
-	if err != nil {
-		return c, err
-	}
+  if !c.Detach {
+    go pipeLogs(c)
+  
+  	err = keepAlive(c)
+  	if err != nil {
+  		return c, err
+  	}
+    
+  	err = rmContainer(c)
+  	if err != nil {
+  		return c, err
+  	}
+  }
 
 	return c, nil
 }
