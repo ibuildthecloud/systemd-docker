@@ -43,6 +43,7 @@ type Context struct {
 	Pid          int
 	PidFile      string
 	Client       *dockerClient.Client
+	Detach       bool
 }
 
 func setupEnvironment(c *Context) {
@@ -82,6 +83,7 @@ func parseContext(args []string) (*Context, error) {
 	flags.BoolVar(&c.Notify, []string{"n", "-notify"}, false, "setup systemd notify for container")
 	flags.BoolVar(&c.Env, []string{"e", "-env"}, false, "inherit environment variable")
 	flags.Var(&flCgroups, []string{"c", "-cgroups"}, "cgroups to take ownership of or 'all' for all cgroups available")
+	flags.BoolVar(&c.Detach, []string{"d", "-detach"}, false, "detach from container")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -550,16 +552,18 @@ func mainWithArgs(args []string) (*Context, error) {
 		return c, err
 	}
 
-	go pipeLogs(c)
+	if !c.Detach {
+		go pipeLogs(c)
 
-	err = keepAlive(c)
-	if err != nil {
-		return c, err
-	}
+		err = keepAlive(c)
+		if err != nil {
+			return c, err
+		}
 
-	err = rmContainer(c)
-	if err != nil {
-		return c, err
+		err = rmContainer(c)
+		if err != nil {
+			return c, err
+		}
 	}
 
 	return c, nil
