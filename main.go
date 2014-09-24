@@ -83,6 +83,7 @@ func parseContext(args []string) (*Context, error) {
 	flags.BoolVar(&c.Notify, []string{"n", "-notify"}, false, "setup systemd notify for container")
 	flags.BoolVar(&c.Env, []string{"e", "-env"}, false, "inherit environment variable")
 	flags.Var(&flCgroups, []string{"c", "-cgroups"}, "cgroups to take ownership of or 'all' for all cgroups available")
+	flags.BoolVar(&c.Detach, []string{"d", "-detach"}, false, "detach from container")
 
 	err := flags.Parse(args)
 	if err != nil {
@@ -132,7 +133,6 @@ func parseContext(args []string) (*Context, error) {
 	c.NotifySocket = os.Getenv("NOTIFY_SOCKET")
 	c.Args = newArgs
 	c.Cgroups = flCgroups.GetAll()
-	c.Detach = foundD
 
 	for _, val := range c.Cgroups {
 		if val == "all" {
