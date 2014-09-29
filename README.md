@@ -49,7 +49,7 @@ In short, it's best to always have `--name %n --rm` in your unit file's `ExecSta
 
 The best way I've found to run containers under systemd is to always assign the container a name.  Even better is to put `--name %n` in your unit file and then the name of the container will match the name of the service unit.
 
-If you don't name your container, you will essentially be creating a new container on every start that will get orphaned.  You're probably clever and thinking you can just add `--rm` and that will take care of the orphans.  The problem with this is that `--rm` is not super reliable.  By naming your container, `systemd-docker` will take extra care to keep the systemd unit and the container in sync.  For example, if you do `--name %n --rm`, `systemd-docker` will ensure that the container is really deleted each time.  The issue with `--rm` is that the remove is done from the client side.  If the client dies, the container is not deleted.  
+If you don't name your container, you will essentially be creating a new container on every start that will get orphaned.  You're probably clever and thinking you can just add `--rm` and that will take care of the orphans.  The problem with this is that `--rm` is not super reliable.  By naming your container, `systemd-docker` will take extra care to keep the systemd unit and the container in sync.  For example, if you do `--name %n --rm`, `systemd-docker` will ensure that the container is really deleted each time.  The issue with `--rm` is that the remove is done from the client side.  If the client dies, the container is not deleted.
 
 If you do `--name %n --rm`, `systemd-docker` on start will look for the named container.  If it exists and is stopped, it will be deleted.  This is really important if you ever change your unit file.  If you change your `ExecStart` command, and it is a named container, the old values will be saved in the stopped container.  By ensuring the container is always deleted, you ensure the args in `ExecStart` are always in sync.
 
@@ -99,6 +99,11 @@ By default `systemd-docker` will send READY=1 to the systemd notification socket
 `ExecStart=/opt/bin/systemd-docker --notify run --rm --name %n nginx`
 
 What this will do is set up a bind mount for the notification socket and then set the NOTIFY_SOCKET environment variable.  If you are going to use this feature of systemd, take some time to understand the quirks of it.  More info in this [mailing list thread](http://comments.gmane.org/gmane.comp.sysutils.systemd.devel/18649).  In short, systemd-notify is not reliable because often the child dies before systemd has time to determine which cgroup it is a member of
+
+Detaching the client
+====================
+
+The `-d` argument to docker has no effect under `systemd-docker`. To cause the `systemd-docker` client to detach after the container is running, simply use `--logs=false --rm=false`. If either `--logs` or `--rm` is true, the `systemd-docker` client will stay alive until it is killed or the container exits.
 
 Running on CoreOS
 =================
