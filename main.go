@@ -170,7 +170,7 @@ func lookupNamedContainer(c *Context) error {
 		})
 	} else {
 		client, err := getClient(c)
-		err = client.StartContainer(container.ID, nil)
+		err = client.StartContainer(container.ID, container.HostConfig)
 		if err != nil {
 			return err
 		}
