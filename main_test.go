@@ -338,7 +338,7 @@ func TestNamedContainerNoRm(t *testing.T) {
 
 	deleteTestContainer(t)
 
-	c, err := mainWithArgs([]string{"--logs", "run", "--name", "systemd-docker-test", "busybox", "echo", "hi"})
+	c, err := mainWithArgs([]string{"--logs", "run", "--privileged=true", "--name", "systemd-docker-test", "--privileged=true", "busybox", "echo", "hi"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -352,7 +352,7 @@ func TestNamedContainerNoRm(t *testing.T) {
 		t.Fatal("Should not be running")
 	}
 
-	c, err = mainWithArgs([]string{"--logs", "run", "--name", "systemd-docker-test", "busybox", "echo", "hi"})
+	c, err = mainWithArgs([]string{"--logs", "run", "--privileged=true", "--name", "systemd-docker-test", "busybox", "echo", "hi"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -369,6 +369,10 @@ func TestNamedContainerNoRm(t *testing.T) {
 	if container.ID != container2.ID {
 		t.Fatal("Should be the same container", container.ID, container2.ID)
 	}
+
+        if !container2.HostConfig.Privileged {
+                t.Fatal("Container2 is not privileged")
+        }
 
 	deleteTestContainer(t)
 }
