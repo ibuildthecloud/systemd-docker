@@ -240,13 +240,13 @@ func TestParseCgroups(t *testing.T) {
 		log.Fatal("Error:", err)
 	}
 
-	if val, ok := cgroups["cpu"]; ok {
-		p := path.Join(SYSFS, "cpu", val)
+	if val, ok := cgroups["blkio"]; ok {
+		p := path.Join(SYSFS, "blkio", val)
 		if _, err := os.Stat(p); os.IsNotExist(err) {
 			log.Fatalf("Path does not exist %s", p, err)
 		}
 	} else {
-		log.Fatal("Failed to find cpu cgroup", val)
+		log.Fatal("Failed to find blkio cgroup", val)
 	}
 }
 
