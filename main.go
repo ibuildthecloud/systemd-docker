@@ -498,7 +498,7 @@ func keepAlive(c *Context) error {
 			}
 
 			if container.State.Running {
-				time.Sleep(INTERVAL * time.Millisecond)
+				client.WaitContainer(c.Id)
 			} else {
 				return nil
 			}
