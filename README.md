@@ -134,6 +134,17 @@ TimeoutStopSec=15
 WantedBy=multi-user.target
 ```
 
+Known issues
+============
+
+### Inconsistent cgroup
+CentOS 7 is inconsistent in the way it handles some cgroups. 
+It has `3:cpuacct,cpu:/user.slice` in `/proc/[pid]/cgroups` which is inconsistent with the cgroup path `/sys/fs/cgroup/cpu,cpuacct/` that systemd-docker is trying to move pids to.
+
+This will cause `systemd-docker` to fail unless run with`systemd-docker --cgroups name=systemd run`
+
+See https://github.com/ibuildthecloud/systemd-docker/issues/15 for details.
+
 License
 -------
 [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0)
