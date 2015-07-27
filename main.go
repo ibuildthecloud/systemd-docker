@@ -262,7 +262,7 @@ func getClient(c *Context) (*dockerClient.Client, error) {
 		endpoint = "unix:///var/run/docker.sock"
 	}
 
-	return dockerClient.NewVersionedClient(endpoint, "1.11")
+	return dockerClient.NewVersionedClient(endpoint, "1.12")
 }
 
 func getContainerPid(c *Context) (int, error) {
