@@ -302,7 +302,12 @@ func getCgroupsForPid(pid int) (map[string]string, error) {
 			continue
 		}
 
-		ret[line[1]] = line[2]
+		// For cgroups like "cpu,cpuacct" the ordering isn't guaranteed to be
+		// the same as the /sys/fs/cgroup dentry. But the kernel provides symlinks
+		// for each of the comma-separated components.
+		for _, part := range strings.Split(line[1], ",") {
+			ret[part] = line[2]
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
